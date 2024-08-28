@@ -1,0 +1,24 @@
+eric-tm-senp-infra:
+  enabled: true
+  metrics:
+    enabled: false
+  brAgent:
+    enabled: false
+
+eric-data-document-database-pg:
+  enabled: true
+  metrics:
+    enabled: false
+
+eric-sec-key-management:
+  enabled: true
+  metrics:
+    enabled: false
+
+eric-sec-sip-tls:
+  enabled: true
+  metrics:
+    enabled: false
+
+eric-data-distributed-coordinator-ed:
+  enabled: true

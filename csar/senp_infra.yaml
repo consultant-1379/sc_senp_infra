@@ -1,0 +1,256 @@
+tosca_definitions_version: tosca_simple_yaml_1_2
+
+description: VNF Descriptor for Ericsson Secondary Network Provider Infra
+
+imports:
+  - etsi_nfv_sol001_vnfd_2_5_1_types.yaml
+
+data_types:
+  Ericsson.SENP-Infra.datatypes.nfv.InstantiateVnfOperationAdditionalParameters:
+    derived_from: tosca.datatypes.nfv.VnfOperationAdditionalParameters
+    properties:
+      #EVNFM specific parameters
+      helm_client_version:
+        type: string
+        description: Helm version to be utilized for LCM operations
+        required: false
+        default: '3.8'
+      skipVerification:
+        type: boolean
+        description: Skipping the verification of the application deployment
+        required: false
+        default: true
+      helmNoHooks:
+        type: boolean
+        description: Skipping the execution of helm hooks
+        required: false
+        default: false
+      skipJobVerification:
+        type: boolean
+        description: Flag indicating whether to bypass verification of pods created as part of Job
+        required: false
+        default: true
+      addNodeToOSS:
+        type: boolean
+        description: The adding of the node to ENM during instantiation
+        required: false
+        default: false
+      cleanUpResources:
+        type: boolean
+        description: Remove the resources on the cluster that are associated with the application, including the Persistent Volume Claims (PVCs) and Persistent Volumes
+        required: false
+        default: false
+      manoControlledScaling:
+        type: boolean
+        description: Flag that indicates how the scaling of the deployment is handled. Defaulted to false, which means the HPA handles scaling If HPAs handle the scaling, then EVNFM does not know the current replica count. The HPA may have scaled the resources based on usage.
+        required: false
+        default: true
+      disableOpenapiValidation:
+        type: boolean
+        description: Flag indicating whether to validate rendered templates against the Kubernetes OpenAPI Schema
+        required: false
+        default: true
+      applicationTimeOut:
+        type: string
+        description: Maximum time allocated for the application to instantiate.
+        required: false
+        default: '60000'
+      retrieveUnsealKey:
+        type: boolean
+        description: determines if the application communicates with the KMS
+        required: false
+        default: true
+      helmWait:
+        type: string
+        description: Maximum time allocated for the application to instantiate
+        required: false
+        default: '60000'
+      namespace:
+        type: string
+        description: The namespace the application is to be deployed into
+        required: false
+        default: 'default'
+      values.yaml:
+        type: string
+        description: This property can contain the contents of a values.yaml file in escaped json format
+        required: false
+  Ericsson.SENP-Infra.datatypes.nfv.ChangePackageVnfOperationAdditionalParameters:
+    derived_from: tosca.datatypes.nfv.VnfOperationAdditionalParameters
+    properties:
+      #EVNFM specific parameters
+      helm_client_version:
+        type: string
+        description: Helm version to be utilized for LCM operations
+        required: false
+        default: '3.8'
+      persistScaleInfo:
+        type: boolean
+        description: persists the scale information from previous state
+        required: false
+        default: true
+      helmNoHooks:
+        type: boolean
+        description: skipping the execution of helm hooks
+        required: false
+        default: false
+      disableOpenapiValidation:
+        type: boolean
+        description: disabled the strict validation checks in helm3
+        required: false
+        default: true
+      isAutoRollbackAllowed:
+        type: boolean
+        description: disabled the auto rollback when an upgrade fails
+        required: false
+        default: false
+      skipVerification:
+        type: boolean
+        description: skipping the verification of the application deployment
+        required: false
+        default: false
+      skipJobVerification:
+        type: boolean
+        description: Flag indicating whether to bypass verification of pods created as part of Job
+        required: false
+        default: true
+      upgrade.downsize.allowed:
+        type: boolean
+        description: Flag to indicate that a non rolling upgrade will be performed and all replicas and replicasets will be set to zero before the upgrade
+        required: false
+        default: false
+      applicationTimeout:
+        type: string
+        description: Maximum time allocated for the application to scale.
+        required: false
+        default: '3600'
+      values.yaml:
+        type: string
+        description: This property can contain the contents of a values.yaml file in escaped json format
+        required: false
+  Ericsson.SENP-Infra.datatypes.nfv.TerminateVnfOperationAdditionalParameters:
+    derived_from: tosca.datatypes.nfv.VnfOperationAdditionalParameters
+    properties:
+      skipVerification:
+        type: boolean
+        description: Skipping the verification of the application termination
+        required: false
+        default: false
+      skipJobVerification:
+        type: boolean
+        description: Flag indicating whether to bypass verification of pods created as part of Job
+        required: false
+        default: false
+      cleanUpResources:
+        type: boolean
+        description: Remove the resources on the cluster that are associated with the application, including the Persistent Volume Claims (PVCs) and Persistent Volumes
+        required: false
+        default: false
+      applicationTimeOut:
+        type: string
+        description: Maximum time allocated for the application to terminate.
+        required: false
+        default: '60000'
+node_types:
+  Ericsson.SENP-Infra:
+    derived_from: tosca.nodes.nfv.VNF
+    properties:
+      descriptor_id:
+        type: string
+        constraints:
+          - valid_values: [ <current-descriptor_id> ]
+        default: <current-descriptor_id>
+      descriptor_version:
+        type: string
+        constraints:
+          - valid_values: [ <current-descriptor_version> ]
+        default: <current-descriptor_version>
+      provider:
+        type: string
+        constraints:
+          - valid_values: [ Ericsson ]
+        default: Ericsson
+      product_name:
+        type: string
+        constraints:
+          - valid_values: [ SENP-Infra ]
+        default: SENP-Infra
+      software_version:
+        type: string
+        constraints:
+          - valid_values: [ '<senp-infra-software_version>' ]
+        default: '<senp-infra-software_version>'
+      vnfm_info:
+        type: list
+        entry_schema:
+          type: string
+          constraints:
+            - valid_values: [ '3881:E-VNFM' ]
+        default: [ '3881:E-VNFM' ]
+      flavour_id:
+        type: string
+        constraints:
+        - valid_values: [default]
+        default: default
+      flavour_description:
+        type: string
+        default: ''
+    interfaces:
+      Vnflcm:
+        type: tosca.interfaces.nfv.Vnflcm
+        instantiate:
+          inputs:
+            helm_packages:
+              type: list
+              entry_schema:
+                type: string
+              required: true
+              description: list of all helm charts
+            additional_parameters:
+              type: Ericsson.SENP-Infra.datatypes.nfv.InstantiateVnfOperationAdditionalParameters
+              required: false
+        terminate:
+          inputs:
+            additional_parameters:
+              type: Ericsson.SENP-Infra.datatypes.nfv.TerminateVnfOperationAdditionalParameters
+              required: false
+        change_package:
+          inputs:
+            additional_parameters:
+              type: Ericsson.SENP-Infra.datatypes.nfv.ChangePackageVnfOperationAdditionalParameters
+              required: false
+    artifacts:
+      crd_package1:
+        description: Service Identity Provider for TLS CRD Helm package associated with this descriptor
+        type: tosca.artifacts.File
+        file: Definitions/OtherTemplates/<eric-sec-sip-tls-crd>
+      crd_package2:
+        description: eric-tm-senp-infra CRD Helm package associated with this descriptor
+        type: tosca.artifacts.File
+        file: Definitions/OtherTemplates/<eric-tm-senp-infra-crd>
+      crd_package3:
+        description: Document Database PG CRD Helm package associated with this descriptor
+        type: tosca.artifacts.File
+        file: Definitions/OtherTemplates/<eric-data-document-database-pg-crd>
+      helm_package1:
+        description: Secondary Network Provider Infra Helm package associated with this descriptor
+        type: tosca.artifacts.File
+        file: Definitions/OtherTemplates/<eric-clc-snia>
+      software_images:
+        description: Location of the software images being used in this package
+        type: tosca.artifacts.nfv.SwImage
+        file: Files/images/docker.tar
+
+topology_template:
+  node_templates:
+    SENP-Infra:
+      type: Ericsson.SENP-Infra
+      properties: {}
+      interfaces:
+        Vnflcm:
+          instantiate:
+            inputs:
+              helm_packages: [ get_artifact: [SELF, crd_package1], get_artifact: [SELF, crd_package2], get_artifact: [SELF, crd_package3], get_artifact: [SELF, helm_package1] ]
+          terminate: {}
+          change_package:
+            inputs:
+              helm_packages: [ get_artifact: [SELF, crd_package1], get_artifact: [SELF, crd_package2], get_artifact: [SELF, crd_package3], get_artifact: [SELF, helm_package1] ]

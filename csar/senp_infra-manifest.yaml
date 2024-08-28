@@ -1,0 +1,8 @@
+vnf_provider_id: Ericsson
+vnf_product_name: SENP-Infra
+vnf_package_version: <current-descriptor_version>
+vnf_release_date_time: <current-date_time>
+vnfd_id: <current-descriptor_id>
+vnf_software_version: CSH109860/1_R1A
+compatible_specification_versions: 3.3.1
+vnfm_info: 3881:E-VNFM

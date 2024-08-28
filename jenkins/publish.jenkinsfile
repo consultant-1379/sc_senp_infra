@@ -1,0 +1,95 @@
+pipeline {
+    options {
+        timeout(time: 15, unit: 'MINUTES')
+        disableConcurrentBuilds()
+        timestamps()
+    }
+    agent {
+        node {
+            label '5G-SC'
+        }
+    }
+    parameters {
+        string(name: 'CHART_NAME', description: 'Chart name e.g.: eric-tm-senp-infra')
+        string(name: 'CHART_REPO', description: 'Chart repo e.g.: https://arm.sero.gic.ericsson.se/artifactory/proj-adp-gs-senp-infra-released-helm')
+        string(name: 'CHART_VERSION', description: 'Chart version e.g.: 1.0.0+6')
+        string(name: 'GERRIT_REFSPEC',  description: 'Gerrit Refspect of the integration chart git repo e.g.: refs/changes/87/4641487/1')
+        string(name: 'VCS_REPO_URL', description: 'To override the default git repo url')
+        string(name: 'VCS_BRANCH', description: 'To override the default git branch')
+        string(name: 'VERSION_CHECK', defaultValue: 'true', description: 'Sanity version check on helm chart version, default value is true i.e., version check is enabled')
+        string(name: 'VERSION_STRATEGY', defaultValue: 'DYNAMIC', description: 'To override the default git branch')
+        string(name: 'ALLOW_DOWNGRADE', defaultValue: 'false', description: 'Allow downgrade of sub-chart dependencies, default value is false')
+        string(name: 'RELEASE', defaultValue: 'true', description: 'Automatic release based on sub-chart version, default value is true')
+    }
+    stages {
+        stage('List ENV Params') {
+            steps {
+                sh 'printenv | sort'
+            }
+        }
+        stage('Clean') {
+            steps {
+                sh 'bob/bob clean'
+            }
+        }
+        stage('Init') {
+            steps {
+                script {
+                    sh 'bob/bob init'
+                }
+            }
+        }
+        stage('Publish Helm Chart') {
+            steps {
+                // Generate integration helm chart
+                withCredentials([
+                                    usernamePassword(credentialsId: 'eiffelesc-credentials', usernameVariable: 'GERRIT_USERNAME', passwordVariable: 'GERRIT_PASSWORD'),
+                                    usernamePassword(credentialsId: 'eiffelesc-armsero-token-credentials', usernameVariable: 'HELM_USER', passwordVariable: 'ARM_API_TOKEN')]) {
+                    sh 'bob/bob ihc:publish'
+                }
+                script {
+                    // set displayed description
+                    currentBuild.description = "sub-chart: ${env.CHART_NAME}, ${env.CHART_VERSION}, ${env.CHART_REPO}<br/>";
+                    currentBuild.description += "override ihc git, branch: ${env.VCS_REPO_URL}, ${env.VCS_BRANCH}<br/>";
+                    currentBuild.description += "version strategy: ${env.VERSION_STRATEGY}, allow downgrade: ${env.ALLOW_DOWNGRADE}<br/>";
+                    // set displayed build name to "BUILD_NUMBER VERSION"
+                    currentBuild.displayName = "${BUILD_NUMBER} ";
+                    env.VERSION = """${sh( returnStdout: true, script: 'grep "^INT_CHART_VERSION=" artifact.properties | awk -F"=" \'{ print $2 }\'')}""".trim()
+                    //currentBuild.displayName += '$(cat artifact.properties | grep "INT_CHART_VERSION=" | sed "s/INT_CHART_VERSION=//g")';
+                    //currentBuild.displayName += '$(grep "^INT_CHART_VERSION=" artifact.properties | awk -F"=" \'{ print $2 }\')';
+                    currentBuild.displayName += "${env.VERSION}";
+                }
+            }
+        }
+        stage('Create & Upload CSAR') {
+            when {
+                anyOf{
+                    environment name: 'CREATE_CSAR', value: 'true'
+                }
+            }
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'eiffelesc-credentials', usernameVariable: 'GERRIT_USERNAME', passwordVariable: 'GERRIT_PASSWORD'),
+                                 usernamePassword(credentialsId: 'eiffelesc-armseli-token-credentials', usernameVariable: 'ARM_USER', passwordVariable: 'ARM_API_TOKEN')]) {
+                    sh 'bob/bob csar'
+                }
+            }
+        }
+        stage('Archive artifact.properties') {
+            steps {
+                // Archive artifact.properties so Spinnaker can read the parameters
+                archiveArtifacts 'artifact.properties'
+
+                // Archive csar artifacts
+                archiveArtifacts artifacts: '.bob/*.csar', allowEmptyArchive: true
+
+                // Archive helm chart artifacts
+                archiveArtifacts artifacts: '.bob/**/*.tgz'
+            }
+        }
+    }
+    post {
+        success {
+            cleanWs()
+        }
+    }
+}

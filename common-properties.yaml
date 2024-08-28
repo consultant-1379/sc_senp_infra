@@ -1,0 +1,263 @@
+modelVersion: 2.0
+
+properties:
+  - ARM_DOCKER_REPO: "armdocker.rnd.ericsson.se"
+
+  - ARM_DOCKER_ARTIFACTORY_URL: "https://${ARM_DOCKER_REPO}/artifactory"
+  - ARM_SELI_ARTIFACTORY_URL: "https://arm.seli.gic.ericsson.se/artifactory"
+  - ARM_SERO_ARTIFACTORY_URL: "https://arm.sero.gic.ericsson.se/artifactory"
+  - ARM_RND_ARTIFACTORY_URL: "https://arm.rnd.ki.sw.ericsson.se/artifactory"
+
+  - ADP_IHC_AUTO: "${ARM_DOCKER_REPO}/proj-adp-cicd-drop/adp-int-helm-chart-auto:latest"
+  - ADP_RELEASE_AUTO: "${ARM_DOCKER_REPO}/proj-adp-cicd-drop/bob-adp-release-auto:latest"
+  - DOC_BUILDER: "${ARM_DOCKER_REPO}/proj-adp-cicd-drop/bob-docbuilder:latest"
+  - ADP_HELM_DR_CHECK: "${ARM_DOCKER_REPO}/proj-adp-cicd-drop/common-library-adp-helm-dr-check:latest"
+  - PYTHON_BUILDER: "${ARM_DOCKER_REPO}/proj-adp-cicd-drop/bob-python3builder:latest"
+  # Package manager latest is not the real latest
+  - PACKAGE_MANAGER: "${ARM_DOCKER_REPO}/proj-am/releases/eric-am-package-manager:2.91.0-1"
+
+  - OUTPUT_DIR: ".bob"
+  - HELM_PRODUCT: "CSH109860" ## TODO: Check the number. Do we use this?
+
+  - HELM_INTERNAL_PROJECT: "proj-sc-senp-infra-umbrella-internal-helm"
+  - HELM_DROP_PROJECT: "proj-sc-senp-infra-umbrella-drop-helm"
+  - HELM_RELEASED_PROJECT: "proj-sc-senp-infra-umbrella-released-helm"
+
+  - HELM_INTERNAL_REPO: "${ARM_SERO_ARTIFACTORY_URL}/${HELM_INTERNAL_PROJECT}"
+  - HELM_DROP_REPO: "${ARM_SERO_ARTIFACTORY_URL}/${HELM_DROP_PROJECT}"
+  - HELM_RELEASED_REPO: "${ARM_SERO_ARTIFACTORY_URL}/${HELM_RELEASED_PROJECT}"
+
+  - CSAR_DEV_PROJECT: "proj-sc-integration-charts-dev-generic-local"
+  - CSAR_RELEASED_PROJECT: "proj-sc-integration-charts-generic-local"
+
+  - CSAR_DEV_REPO: "${ARM_DOCKER_ARTIFACTORY_URL}/${CSAR_DEV_PROJECT}"
+  - CSAR_RELEASED_REPO: "${ARM_DOCKER_ARTIFACTORY_URL}/${CSAR_RELEASED_PROJECT}"
+
+  - IHC_NAME: "eric-clc-snia" # Integration Helm Chart name
+  - IHC_PATH: "charts/${IHC_NAME}" # Integration Helm Chart path
+
+  # Dependencies for the CSAR package creation
+  - CNCS_BASE_NAME: "eric-cloud-native-base"
+
+docker-images:
+  - inca: ${ADP_IHC_AUTO}
+  - release-auto: ${ADP_RELEASE_AUTO}
+  # Image for document actions used for markdown (MD) file lint
+  - doc-builder: ${DOC_BUILDER}
+  # Image for helm-dr-checker tool used for
+  - adp-helm-dr-check: ${ADP_HELM_DR_CHECK}
+  # Image for CSAR packages
+  - package-manager: ${PACKAGE_MANAGER}
+  # Python 3 builder
+  - python3-builder: ${PYTHON_BUILDER}
+
+var:
+  - helm_version
+  - cncs-base-repo
+  - cncs-base-version
+  - int-chart-name
+  - int-chart-repo
+  - int-chart-version
+
+env:
+# general variables
+  - USER
+  - HOME (default="/home/${env.USER}")
+  - HUDSON_URL (default="https://fem1s10-eiffel029.eiffel.gic.ericsson.se:8443/jenkins")
+
+# Helm related parameters
+# WARNING: Consider to use repositories.yaml file
+  - HELM_USER (default="${env.USER}") # User signum
+  - ARM_API_TOKEN # The user's identity token in ARM SERO (Not the API key)
+
+# Git related parameters
+  - GERRIT_USERNAME
+  - GERRIT_PASSWORD
+  - GIT_REPO_URL (default="https://gerrit.ericsson.se/a/MC_5G/sc_senp_infra")
+  - VCS_REPO_URL # override GIT_REPO_URL, set in Jenkins pipeline configuration parameters
+  - GIT_BRANCH (default="master")
+  - VCS_BRANCH # override GIT_BRANCH, set in Jenkins pipeline configuration parameters
+
+# parameters related to csar
+  - INT_CHART_NAME
+  - INT_CHART_VERSION
+  - INT_CHART_REPO
+
+rules:
+  clean:
+    - task: bob-cache
+      description: Clean .bob folder
+      cmd: rm -rf ${OUTPUT_DIR}/
+
+  init:
+    - description: Initialize the BOB building workspace
+    - task: create-output-dir
+      description: Make .bob folder
+      cmd: /bin/bash -c 'mkdir -p ${OUTPUT_DIR}/'
+    - task: copy-help-repo
+      description: Copy helm repositories file in .bob folder
+      cmd: "cat ~/.artifactory/helm_repositories.yaml | sed 's/artifactory.*/artifactory/g' > ${OUTPUT_DIR}/repositories.yaml"
+    - task: check-helm-version
+      description: check inca default helm version (required from set-helm-version)
+      docker-image: inca
+      cmd: helm version
+    - task: set-helm-version
+      description: set latest helm version supported by inca
+      cmd: helm_versions=($(docker inspect ${ADP_IHC_AUTO} --format='{{index .Config.Labels "adp.helm3-versions"}}'));
+           versions=${#helm_versions[@]};
+           if [ $? != 0 ]; then echo "[ERROR] cannot inspect ${ADP_IHC_AUTO} image"; exit 1; fi;
+           if [ ${versions} == 0 ]; then echo "[ERROR] inca tool does not support any helm version"; exit 1; fi;
+           echo ${helm_versions[${versions}-1]} > ${OUTPUT_DIR}/var.helm_version;
+    - task: copy-docker-config
+      description: Copy docker config to be used for docker image fetch
+      cmd:
+        - cp ${env.HOME}/.docker/config.json ${OUTPUT_DIR}/config.json
+        - chmod 604 ${OUTPUT_DIR}/config.json
+    - task: extract-cncs-base-version
+      docker-image: python3-builder
+      cmd: sh -c './tools/getDependencyData.py --name ${CNCS_BASE_NAME} --key version > ${OUTPUT_DIR}/var.cncs-base-version'
+    - task: extract-cncs-base-repo
+      docker-image: python3-builder
+      cmd: sh -c './tools/getDependencyData.py --name ${CNCS_BASE_NAME} --key repository > ${OUTPUT_DIR}/var.cncs-base-repo'
+
+  package:
+    - task: get-int-chart-name-property
+      description: Extract integration chart name from artifacts
+      cmd: /bin/bash -c "grep '^INT_CHART_NAME=' artifact.properties | sed 's/.*=\(.*\)/\1/' > ${OUTPUT_DIR}/var.int-chart-name"
+    - task: get-int-chart-repo-property
+      description: Extract integration chart name from artifacts
+      cmd: /bin/bash -c "grep '^INT_CHART_REPO=' artifact.properties | sed 's/.*=\(.*\)/\1/' > ${OUTPUT_DIR}/var.int-chart-repo"
+    - task: get-int-chart-version-property
+      description: Extract integration chart version from artifacts
+      cmd: /bin/bash -c "grep '^INT_CHART_VERSION=' artifact.properties | sed 's/.*=\(.*\)/\1/' > ${OUTPUT_DIR}/var.int-chart-version"
+    - task: get-int-chart-name-env
+      description: Extract integration chart name from env parameter
+      cmd: /bin/bash -c "echo ${env.INT_CHART_NAME} > ${OUTPUT_DIR}/var.int-chart-name"
+    - task: get-int-chart-repo-env
+      description: Extract integration chart name from env parameter
+      cmd: /bin/bash -c "echo ${env.INT_CHART_REPO} > ${OUTPUT_DIR}/var.int-chart-repo"
+    - task: get-int-chart-version-env
+      description: Extract integration chart version from env parameter
+      cmd: /bin/bash -c "echo ${env.INT_CHART_VERSION} > ${OUTPUT_DIR}/var.int-chart-version"
+    - task: untar-int-chart
+      docker-image: release-auto
+      cmd: tar xzfk ${OUTPUT_DIR}/${var.int-chart-name}-${var.int-chart-version}.tgz -C ${OUTPUT_DIR}/
+    - task: fetch-ihc-crd
+      description: Download CRD dependencies for CSAR package activities
+      cmd: /bin/bash -c 'crddirs=($(find ${OUTPUT_DIR}/${var.int-chart-name} -name eric-crd));
+                         echo "crds= ${crddirs[@]}";
+                         for (( i=0; i<${#crddirs[@]}; i++ )); do
+                             cp ${crddirs[$i]}/* ${OUTPUT_DIR}/;
+                         done'
+    - task: fetch-cncs-base-chart
+      description: Download CNCS base dependencies for CSAR package activities
+      docker-image: release-auto
+      cmd: helm pull --repo ${var.cncs-base-repo} ${CNCS_BASE_NAME} --version ${var.cncs-base-version} -d ${OUTPUT_DIR}/ --username "${env.GERRIT_USERNAME}" --password "${env.GERRIT_PASSWORD}"
+    - task: untar-cncs-base-chart
+      docker-image: release-auto
+      cmd: tar xzfk ${OUTPUT_DIR}/${CNCS_BASE_NAME}-${var.cncs-base-version}.tgz -C ${OUTPUT_DIR}/
+    - task: fetch-cncs-crd
+      description: Download CRD dependencies for CSAR package activities
+      cmd: /bin/bash -c 'crddirs=($(find ${OUTPUT_DIR}/${CNCS_BASE_NAME}/charts/eric-sec-sip-tls -name eric-crd));
+                         echo "crds= ${crddirs[@]}";
+                         for (( i=0; i<${#crddirs[@]}; i++ )); do
+                             cp ${crddirs[$i]}/* ${OUTPUT_DIR}/;
+                         done'
+    - task: copy-csar-files
+      cmd:
+        - /bin/bash -c 'mkdir -p ${OUTPUT_DIR}/package'
+        - /bin/bash -c 'cp -r csar/* ${OUTPUT_DIR}/package'
+        - /bin/bash -c 'mv ${OUTPUT_DIR}/*.tgz ${OUTPUT_DIR}/package'
+        - /bin/bash -c 'echo "CSAR helm charts -> $(ls ${OUTPUT_DIR}/package | grep tgz)"'
+    - task: move-exposed-values-to-release-artifacts-dir
+      cmd: /bin/bash -c "if [[ ! -d ${OUTPUT_DIR}/release_artifacts ]];
+                         then
+                            echo 'creating ${OUTPUT_DIR}/release_artifacts';
+                            mkdir ${OUTPUT_DIR}/release_artifacts;
+                         fi;
+                         cp release_artifacts/exposed-values.yaml ${OUTPUT_DIR}/release_artifacts/exposed-values-${var.int-chart-version}.yaml"
+    - task: update-vnfd
+      docker-image: python3-builder
+      docker-flags:
+        - "--env HELM_VERSION=${HELM_VERSION_HELMBUILDERPY3}"
+      cmd:
+        - /bin/bash -c "./tools/vnfd.py vnfd_id;"
+        - /bin/bash -c "./tools/vnfd.py vnfd_version"
+        - /bin/bash -c "./tools/vnfd.py senp_infra;"
+        - /bin/bash -c "./tools/vnfd.py senp_infra_crd;"
+        - /bin/bash -c "./tools/vnfd.py cn_base;"
+        - /bin/bash -c "./tools/vnfd.py sip_tls_crd;"
+        - /bin/bash -c "./tools/vnfd.py document_db_pg_crd;"
+        - /bin/bash -c "./tools/vnfd.py sw_version;"
+    - task: csar
+      description: Create CSAR package
+      docker-image: package-manager
+      docker-flags:
+        - "--volume $PWD/${OUTPUT_DIR}:/csar"
+        - "--volume /var/run/docker.sock:/var/run/docker.sock"
+        - "--workdir /csar"
+        - "--user root:root"
+      cmd: 'generate --helm-dir /csar/package
+                     --name eric-senp-infra-${var.int-chart-version}
+                     --vnfd /csar/package/senp_infra.yaml
+                     --definitions /csar/package/etsi_nfv_sol001_vnfd_2_5_1_types.yaml
+                     --values-csar /csar/package/senp_infra-manifest.yaml
+                     --docker-config /csar
+                     --values /csar/package/values.yaml
+                     --helm3
+                     --agentk
+                     --helm-version "3.8.2"
+                     --log DEBUG
+                     --helm-debug'
+
+  help:
+    - task: ihc-auto
+      description: inca ihc-auto help
+      docker-image: inca
+      cmd: ihc-auto --help
+    - task: inca-config
+      description: default configuration of inca tool
+      cmd: sh -c "docker inspect ${ADP_IHC_AUTO} --format='{{json .Config}}' | python -m json.tool"
+    - task: ihc-generate-artifacts
+      description: inca ihc-generate-artifacts help
+      docker-image: inca
+      cmd: ihc-generate-artifacts --help
+    - task: ihc-update
+      description: ihc-update help
+      docker-image: inca
+      cmd: ihc-update --help
+    - task: ihc-package
+      description: ihc-package help
+      docker-image: inca
+      cmd: ihc-package --help
+    - task: arm-upload
+      description: arm-upload help
+      docker-image: inca
+      cmd: arm-upload --help
+    - task: cihelm
+      description: cihelm help
+      docker-image: inca
+      cmd: cihelm --help
+    - task: gerrit
+      description: gerrit help
+      docker-image: inca
+      cmd: gerrit --help
+    - task: auto-jenkins-lint
+      description: jenkins lint help
+      docker-image: release-auto
+      cmd: jenkins-lint --help
+    - task: helm-dr-check
+      description: check helm DRs help
+      docker-image: adp-helm-dr-check
+      cmd: helm-dr-check --help
+    - task: markdown-lint
+      description: markdown lint help
+      docker-image: doc-builder
+      cmd: markdownlint --help
+    - task: package
+      description: package manager help
+      docker-image: package-manager
+      cmd: generate -h
+    - task: auto-upload
+      docker-image: release-auto
+      cmd: upload_helm_package -h

@@ -1,0 +1,4 @@
+dependencies:
+- name: eric-cloud-native-base
+  repository: https://arm.sero.gic.ericsson.se/artifactory/proj-adp-umbrella-released-helm/
+  version: 100.0.0

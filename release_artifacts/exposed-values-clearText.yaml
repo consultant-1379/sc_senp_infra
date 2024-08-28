@@ -1,0 +1,218 @@
+## Current values yaml file used only for internal testing activities
+## WARNING: It might contain outdate or invalid parameters/values
+
+global:
+  networkPolicy:
+    enabled: false
+  nodeSelector:
+    senp: senp
+  registry:
+    url: k8s-registry.eccd.local
+  security:
+    tls:
+      enabled: false
+
+eric-sec-key-management:
+  enabled: false
+  metrics:
+    enabled: false
+  replicaCount:
+    kms: 2
+
+eric-sec-sip-tls:
+  enabled: false
+  metrics:
+    enabled: false
+
+eric-data-distributed-coordinator-ed:
+  enabled: false
+  service:
+    endpoints:
+      dced:
+        acls:
+          adminSecret: eric-clc-snia-dced-creds
+
+eric-data-document-database-pg:
+  enabled: true
+  credentials:
+    kubernetesSecretName: "eric-clc-snia-dbpg-creds"
+
+eric-tm-senp-infra:
+  enabled: true
+  # interfaces: []
+  ## Example:
+  ## interfaces:
+  ##   - eth2
+  # config:
+    # excludedPrefixes: ""
+    ## Example:
+    ## excludedPrefixes: "prefixes: \n- 214.14.132.129/32 \n- 214.14.132.130/32 \n- 214.14.132.131/32 \n- 214.14.132.161/32 \n- 214.14.132.162/32 \n- 214.14.132.163/32"
+  # resources:
+    # forwarderVpp:
+      # limits:
+        # cpu: "2000m"
+        # memory: "6Gi"
+        # ephemeral-storage: "512Mi"
+      # requests:
+        # cpu: "2000m"
+        # memory: "6Gi"
+        # ephemeral-storage: "512Mi"
+    # nsmgr:
+      # limits:
+        # cpu: "400m"
+        # memory: "400Mi"
+        #ephemeral-storage: ""
+      # requests:
+        # cpu: "330m"
+        # memory: "256Mi"
+        #ephemeral-storage: ""
+    # registryK8S:
+      # limits:
+        # cpu: "400m"
+        # memory: "500Mi"
+        # ephemeral-storage: ""
+      # requests:
+        # cpu: "300m"
+        # memory: "500Mi"
+        # ephemeral-storage: ""
+    # spireAgent:
+      # limits:
+        # cpu: "1"
+        # memory: "570Mi"
+        # ephemeral-storage: ""
+      # requests:
+        # cpu: "800m"
+        # memory: "512Mi"
+        # ephemeral-storage: ""
+    # spireServer:
+      # limits:
+        # cpu: "500m"
+        # memory: "512Mi"
+        # ephemeral-storage: ""
+      # requests:
+        # cpu: "500m"
+        # memory: "512Mi"
+        # ephemeral-storage: ""
+    # k8sWorkloadRegistrar:
+      # limits:
+        # cpu: "330m"
+        # memory: "480Mi"
+        # ephemeral-storage: ""
+      # requests:
+        # cpu: "110m"
+        # memory: "160Mi"
+        # ephemeral-storage: ""
+    # spireAgentInit:
+      # limits:
+        # cpu: "300m"
+        # memory: "90Mi"
+        # ephemeral-storage: ""
+      # requests:
+        # cpu: "100m"
+        # memory: "30Mi"
+        # ephemeral-storage: ""
+  spire:
+    db:
+      # Name of the kubernetes secret with password for Spire to connect to the DB, needed if no TLS configured
+      credentialSecret: "eric-clc-snia-dbpg-creds"
+      # if not set the host will be generated as <.Values.spire.db.tls.clientCert.dbProvider>.<.Release.Namespace>.svc.cluster.local
+      host: "eric-data-document-database-pg"
+      name: "senpinfradb"
+      user: "senp-infra-db-user"
+      # DB type possible values: sqlite3, postgres, mysql
+      type: "postgres"
+      tls:
+        # The TLS is primarily set by global.security.tls.enabled (by default true),
+        # if spire.db.tls.enabled is configured, it overrides the global config
+        enabled: false
+        # The client cert is needed for client authentication at the DB side, this cert should be signed by the DB's CA
+        clientCert:
+          secret: ""
+          # The name of the deployed DocDB instance, used only in case of the InternalCertificate is generated or if spire.db.host is not defined
+          dbProvider: ""
+          # If not set it will be the spire.db.user, used only in case of the InternalCertificate is generated
+          commonName: ""
+        # The root cert is needed to authenticate the DB provider, CA of the mutually trusted 3rd party (eg: SIP-TLS)
+        rootCert:
+          secret: ""
+
+eric-lm-combined-server:
+  enabled: false
+
+eric-lm-combined-server-db-pg:
+  enabled: false
+
+eric-si-application-sys-info-handler:
+  enabled: false
+
+eric-fh-snmp-alarm-provider:
+  enabled: false
+
+eric-fh-alarm-handler:
+  enabled: false
+
+eric-fh-alarm-handler-db-pg:
+  enabled: false
+
+eric-data-object-storage-mn:
+  enabled: false
+
+eric-odca-diagnostic-data-collector:
+  enabled: false
+
+eric-sec-access-mgmt:
+  enabled: false
+
+eric-sec-access-mgmt-db-pg:
+  enabled: false
+
+eric-sec-certm:
+  enabled: false
+
+eric-ctrl-bro:
+  enabled: false
+
+eric-pm-server:
+  enabled: false
+
+eric-cm-mediator:
+  enabled: false
+
+eric-cm-mediator-db-pg:
+  enabled: false
+
+eric-data-search-engine-curator:
+  enabled: false
+
+eric-data-search-engine:
+  enabled: false
+
+eric-log-shipper:
+  enabled: false
+
+eric-log-transformer:
+  enabled: false
+
+eric-dst-agent:
+  enabled: false
+
+eric-dst-collector:
+  enabled: false
+
+eric-tm-ingress-controller-cr:
+  enabled: false
+
+eric-data-key-value-database-rd:
+  enabled: false
+
+eric-cloud-native-kvdb-rd-operand:
+  enabled: false
+
+eric-data-document-database-pg:
+  enabled: false
+
+eric-data-message-bus-kf:
+  enabled: false
+
+eric-data-coordinator-zk:
+  enabled: false

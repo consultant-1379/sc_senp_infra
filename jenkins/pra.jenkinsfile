@@ -1,0 +1,121 @@
+pipeline {
+    agent {
+        node {
+            label '5G-SC'
+        }
+    }
+    options {
+        timeout(time: 15, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '30'))
+        timestamps()
+    }
+    parameters {
+        string(name: 'INT_CHART_VERSION', description: 'The version of the released integration chart uploaded to released repository e.g.: 1.0.0')
+        string(name: 'INT_CHART_NAME', description: 'The name of the released integration chart uploaded to released repository e.g.: eric-clc-snia')
+        string(name: 'INT_CHART_REPO', description: 'The url of the released integration chart repo e.g.: https://arm.sero.gic.ericsson.se/artifactory/proj-adp-gs-senp-infra-released-helm')
+        string(name: 'CHART_NAME', description: 'The name of the microservice triggering the release pipeline e.g.: eric-tm-senp-infra')
+        string(name: 'CHART_VERSION', description: 'The version of the microservice triggering the release pipeline e.g.: 1.0.0+6')
+        string(name: 'RELEASE', description: 'Release Switch for SENP-INFRA services release pipelines')
+        booleanParam(name: 'DRY_RUN', defaultValue: false, description: 'Enable dry-run')
+        string(name: 'RELEASE_EMAILS', defaultValue: '095da89b.ericsson.onmicrosoft.com@emea.teams.ms, IXG-ChallengersTeam@ericsson.onmicrosoft.com, PDLTEAMNOK@pdl.internal.ericsson.com', description: 'Release email recipients mailing list')
+        string(name: 'FAILURE_EMAILS', defaultValue: '095da89b.ericsson.onmicrosoft.com@emea.teams.ms, IXG-ChallengersTeam@ericsson.onmicrosoft.com', description: 'Failure to release SENP-INFRA email recipients mailing list')
+    }
+    stages {
+        stage('List ENV Params') {
+            steps {
+                sh 'printenv | sort'
+            }
+        }
+        stage('Cleanup') {
+            steps {
+                // Delete build and .bob folder
+                sh 'bob/bob -r ruleset2.0-pra.yaml clean'
+            }
+        }
+        stage('Init') {
+            steps {
+                // Create version without build number
+                sh 'bob/bob -r ruleset2.0-pra.yaml init'
+
+                // Update current build description in Jenkins to print inforamtion
+                // related to what triggered this build
+                script {
+                    currentBuild.description = params.INT_CHART_NAME + ' released.' + '<br/>';
+                    currentBuild.description += 'repo: ' + params.INT_CHART_REPO + '<br/>';
+                    currentBuild.description += 'version: ' + params.INT_CHART_VERSION;
+                }
+            }
+        }
+        stage('Download Helm Chart') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'eiffelesc-credentials', usernameVariable: 'GERRIT_USERNAME', passwordVariable: 'GERRIT_PASSWORD')])
+                {
+                    // Pull helm chart and untar
+                    sh 'bob/bob -r ruleset2.0-pra.yaml helm-get'
+                }
+            }
+        }
+        stage('Helm checksum') {
+            steps {
+                // Generate sha256 checksum for helm package
+                sh 'bob/bob -r ruleset2.0-pra.yaml helm-checksum'
+            }
+        }
+        stage('Git commithash') {
+            steps {
+                // Get Commit hash for released commit
+                sh 'bob/bob -r ruleset2.0-pra.yaml git-commithash'
+            }
+        }
+        stage('Create & Upload CSAR') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'eiffelesc-credentials', usernameVariable: 'GERRIT_USERNAME', passwordVariable: 'GERRIT_PASSWORD'),
+                                 usernamePassword(credentialsId: 'eiffelesc-armseli-token-credentials', usernameVariable: 'ARM_USER', passwordVariable: 'ARM_API_TOKEN')]) {
+                    sh 'bob/bob -r ruleset2.0-pra.yaml csar'
+                }
+            }
+        }
+        stage('Archive Artifacts') {
+            steps {
+                // Archive csar artifacts
+                archiveArtifacts artifacts: '.bob/*.csar'
+                // Archive helm chart artifacts
+                archiveArtifacts artifacts: '.bob/**/*.tgz'
+            }
+        }
+        stage('Create GIT Tag Artifacts') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'eiffelesc-credentials', usernameVariable: 'GERRIT_USERNAME', passwordVariable: 'GERRIT_PASSWORD')])
+                {
+                    // Create and push git tag pra/<version>
+                    sh 'bob/bob -r ruleset2.0-pra.yaml git-tag'
+                }
+            }
+        }
+        stage('Send Release Email') {
+            steps {
+                script {
+                    VERSION = sh(returnStdout: true, script: 'cat .bob/var.semver').trim()
+                    message = "SENP-Infra PRA announcement"
+                    mail to: params.RELEASE_EMAILS,
+                         from: 'IHC Infra PRA pipeline <no-reply@ericsson.com>',
+                         subject:"SENP-Infra $VERSION PRA Release",
+                         body: message,
+                         mimeType: 'text/html'
+                }
+            }
+        }
+    }
+    post {
+        success {
+            cleanWs()
+        }
+        failure {
+            mail to: params.FAILURE_EMAILS,
+                 from: 'IHC Infra PRA pipeline <no-reply@ericsson.com>',
+                 subject: "SENP-Infra PRA Release failed",
+                 body: "SENP-Infra Release Pipeline Failure on ${env.BUILD_URL}.<br/>Job: ${currentBuild.fullDisplayName}",
+                 mimeType: 'text/html'
+        }
+    }
+}

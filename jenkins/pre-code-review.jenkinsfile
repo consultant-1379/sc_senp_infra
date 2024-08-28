@@ -1,0 +1,152 @@
+pipeline {
+    agent {
+        node {
+            label '5G-SC'
+        }
+    }
+    options {
+        timeout(time: 20, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '30'))
+        timestamps()
+    }
+    stages {
+        stage('List ENV Params') {
+            steps {
+                sh 'printenv | sort'
+            }
+        }
+        stage('Clean') {
+            steps {
+                sh 'bob/bob clean'
+            }
+        }
+        stage('Init') {
+            steps {
+                sh 'bob/bob init'
+            }
+        }
+        stage('Lint before IHC package') {
+            parallel {
+                stage('Lint MarkDown') {
+                    steps {
+                        sh './bob/bob lint:markdown'
+                    }
+                }
+                stage('Lint Helm') {
+                    when {
+                        anyOf{
+                            environment name: 'HELM_LINT_PHASE', value: 'BEFORE'
+                            environment name: 'HELM_LINT_PHASE', value: 'BOTH'
+                        }
+                    }
+                    steps {
+                        sh './bob/bob lint:helm'
+                        // apply helm dr checks on helm chart files cloned by
+                        // jenkins job from master branch
+                        sh './bob/bob lint:helm-chart-check'
+                    }
+                }
+                // stage('Lint Jenkinsfiles') {
+                //     steps {
+                //         withCredentials([usernamePassword(credentialsId: 'eiffelesc-credentials', usernameVariable: 'GERRIT_USERNAME', passwordVariable: 'GERRIT_PASSWORD')]) {
+                //             sh './bob/bob lint:jenkinsfiles'
+                //         }
+                //     }
+                // }
+            }
+        }
+        stage('Trigger ihc actions') {
+            steps {
+                // Generate integration helm chart
+                withCredentials([
+                    usernamePassword(credentialsId: 'eiffelesc-credentials', usernameVariable: 'GERRIT_USERNAME', passwordVariable: 'GERRIT_PASSWORD'),
+                    usernamePassword(credentialsId: 'eiffelesc-armsero-token-credentials', usernameVariable: 'HELM_USER', passwordVariable: 'ARM_API_TOKEN')]) {
+                    sh 'bob/bob ihc:dev'
+                }
+            }
+        }
+        stage('Lint after IHC package') {
+            parallel {
+                stage('Lint Helm') {
+                    when {
+                        anyOf{
+                            environment name: 'HELM_LINT_PHASE', value: 'AFTER'
+                            environment name: 'HELM_LINT_PHASE', value: 'BOTH'
+                        }
+                    }
+                    steps {
+                        sh './bob/bob lint:inca-helm'
+                        // apply helm dr checks on helm chart files cloned by
+                        // jenkins job from master branch
+                        sh './bob/bob lint:inca-helm-chart-check'
+                    }
+                }
+            }
+        }
+        stage('Generate Artifacts') {
+            steps {
+                script {
+                    sh 'echo "VCS_REPO_URL=${VCS_REPO_URL}" >> artifact.properties'
+                    sh 'echo "VCS_BRANCH=${VCS_BRANCH}" >> artifact.properties'
+
+                    // set displayed build name to "BUILD_NUMBER VERSION"
+                    currentBuild.displayName = "${BUILD_NUMBER} ";
+                    env.VERSION = """${sh( returnStdout: true, script: 'grep "^INT_CHART_VERSION=" artifact.properties | awk -F"=" \'{ print $2 }\'')}""".trim()
+                    currentBuild.displayName += "${env.VERSION}";
+                }
+            }
+        }
+        stage('Create & Upload CSAR') {
+            when {
+                anyOf{
+                    environment name: 'CREATE_CSAR', value: 'true'
+                }
+            }
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'eiffelesc-credentials', usernameVariable: 'GERRIT_USERNAME', passwordVariable: 'GERRIT_PASSWORD'),
+                                 usernamePassword(credentialsId: 'eiffelesc-armseli-token-credentials', usernameVariable: 'ARM_USER', passwordVariable: 'ARM_API_TOKEN')]) {
+                    sh 'bob/bob csar'
+                }
+            }
+        }
+        stage('Archive Artifacts') {
+            steps {
+                // Archive artifact.properties so Spinnaker can read the parameters
+                archiveArtifacts 'artifact.properties'
+
+                // Archive helm dr reports
+                archiveArtifacts artifacts: '.bob/helm-dr-check/design-rule-check-report.*', allowEmptyArchive: true
+                junit testResults: '.bob/helm-dr-check/design-rule-check-report-junit.xml', allowEmptyResults: true
+                archiveArtifacts artifacts: '.bob/new-helm-dr-check/design-rule-check-report.*', allowEmptyArchive: true
+                junit testResults: '.bob/new-helm-dr-check/design-rule-check-report-junit.xml', allowEmptyResults: true
+                publishHTML (target: [
+                    allowMissing: false,
+                    alwaysLinkToLastBuild: false,
+                    keepAll: true,
+                    reportDir: '.bob/helm-dr-check/',
+                    reportFiles: 'design-rule-check-report.html',
+                    reportName: "Helm Design Rule Check"
+                    ])
+                publishHTML (target: [
+                    allowMissing: false,
+                    alwaysLinkToLastBuild: false,
+                    keepAll: true,
+                    reportDir: '.bob/new-helm-dr-check/',
+                    reportFiles: 'design-rule-check-report.html',
+                    reportName: "Helm Design Rule Check [INCA]"
+                    ])
+
+                // Archive csar artifacts
+                archiveArtifacts artifacts: '.bob/*.csar', allowEmptyArchive: true
+
+                // Archive helm chart artifacts
+                archiveArtifacts artifacts: '.bob/**/*.tgz'
+            }
+        }
+    }
+    post {
+        success {
+            cleanWs()
+        }
+    }
+}

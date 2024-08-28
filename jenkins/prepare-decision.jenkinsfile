@@ -1,0 +1,70 @@
+pipeline {
+    agent {
+        node {
+            label '5G-SC'
+        }
+    }
+    options {
+        timeout(time: 2, unit: 'MINUTES')
+        timestamps()
+    }
+    parameters {
+        string(name: 'CHART_NAME', description: 'Chart name e.g.: eric-tm-senp-infra')
+        string(name: 'CHART_REPO', description: 'Chart repo e.g.: https://arm.sero.gic.ericsson.se/artifactory/proj-adp-gs-senp-infra-released-helm')
+        string(name: 'CHART_VERSION', description: 'Chart version e.g.: 1.0.0+6')
+        string(name: 'GIT_REPO_URL', defaultValue: 'https://gerrit.ericsson.se/MC_5G/sc_senp_infra', description: 'GIT repo url eg: https://gerrit.ericsson.se/MC_5G/sc_senp_infra')
+        string(name: 'GERRIT_REFSPEC',  description: 'Gerrit Refspect of the integration chart git repo e.g.: refs/changes/87/4641487/1')
+        string(name: 'VCS_REPO_URL', description: 'To override the default git repo url')
+        string(name: 'VCS_BRANCH', description: 'To override the default git branch')
+        booleanParam(name: 'VERSION_CHECK', defaultValue: true, description: 'Sanity version check on helm chart version, default value is true i.e., version check is enabled')
+        booleanParam(name: 'CREATE_EP', defaultValue: false, description: 'Flag to prepare helm chart EP, default value is false i.e., EP flag is disabled')
+    }
+    stages {
+        stage('List ENV Params') {
+            steps {
+                sh 'printenv | sort'
+            }
+        }
+        stage('Check Downgrade for EP') {
+            steps {
+                script{
+                    sh 'echo "ALLOW_DOWNGRADE=${CREATE_EP}" > artifact.properties'
+                    if ("${CREATE_EP}" == "true") {
+                        echo "Allow downgrade for EP package"
+                        sh 'echo "VERSION_STRATEGY=EP" >> artifact.properties'
+                    }
+                    else {
+                        echo "Downgrade not allowed"
+                        sh 'echo "VERSION_STRATEGY=DYNAMIC" >> artifact.properties'
+                    }
+                } // script
+            }
+        }
+        // do more checks here??
+        stage('Generate Artifacts') {
+            steps {
+                script {
+                    sh 'echo "CHART_NAME=${CHART_NAME}" >> artifact.properties'
+                    sh 'echo "CHART_REPO=${CHART_REPO}" >> artifact.properties'
+                    sh 'echo "CHART_VERSION=${CHART_VERSION}" >> artifact.properties'
+                    sh 'echo "GIT_REPO_URL=${GIT_REPO_URL}" >> artifact.properties'
+                    sh 'echo "GERRIT_REFSPEC=${GERRIT_REFSPEC}" >> artifact.properties'
+                    sh 'echo "VCS_REPO_URL=${VCS_REPO_URL}" >> artifact.properties'
+                    sh 'echo "VCS_BRANCH=${VCS_BRANCH}" >> artifact.properties'
+                    sh 'echo "VERSION_CHECK=${VERSION_CHECK}" >> artifact.properties'
+                    sh 'echo "CREATE_EP=${CREATE_EP}" >> artifact.properties'
+                }
+            }
+        }
+        stage('Archive Artifacts') {
+            steps {
+                archiveArtifacts 'artifact.properties'
+            }
+        }
+    }
+    post {
+        always {
+            cleanWs()
+        }
+    }
+}

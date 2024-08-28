@@ -1,0 +1,27 @@
+apiVersion: v2
+appVersion: 4.1.2
+dependencies:
+- condition: eric-sec-key-management.enabled
+  name: eric-sec-key-management
+  repository: https://arm.sero.gic.ericsson.se/artifactory/proj-adp-gs-all-helm/
+  version: 8.0.0+33
+- condition: eric-sec-sip-tls.enabled
+  name: eric-sec-sip-tls
+  repository: https://arm.sero.gic.ericsson.se/artifactory/proj-adp-gs-all-helm/
+  version: 11.0.0+29
+- condition: eric-data-distributed-coordinator-ed.enabled
+  name: eric-data-distributed-coordinator-ed
+  repository: https://arm.sero.gic.ericsson.se/artifactory/proj-adp-gs-all-helm
+  version: 10.8.0+15
+- condition: eric-tm-senp-infra.enabled
+  name: eric-tm-senp-infra
+  repository: https://arm.sero.gic.ericsson.se/artifactory/proj-adp-gs-senp-infra-released-helm/
+  version: 1.14.0+77
+- condition: eric-data-document-database-pg.enabled
+  name: eric-data-document-database-pg
+  repository: https://arm.sero.gic.ericsson.se/artifactory/proj-adp-gs-released-helm/
+  version: 9.1.0+9
+description: Ericsson Signaling Controller SENP Infra. (c) Ericsson AB 2023
+name: eric-clc-snia
+type: application
+version: 4.1.2

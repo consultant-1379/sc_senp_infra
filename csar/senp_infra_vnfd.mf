@@ -1,0 +1,5 @@
+metadata:
+vnf_provider_id: Ericsson
+vnf_product_name: SENP-Infra
+vnf_package_version: <current-descriptor_version>
+vnf_release_date_time: <current-date_time>

@@ -1,0 +1,88 @@
+modelVersion: 2.0
+
+import:
+  common: common-properties.yaml
+
+env:
+ - DRY_RUN (default=false)
+
+var:
+ - sha256-helm
+ - commithash
+ - semver
+ - major
+
+rules:
+  clean:
+    - rule: common.clean
+
+  init:
+    - rule: common.init
+    - task: common.package:get-int-chart-name-env
+    - task: common.package:get-int-chart-repo-env
+    - task: common.package:get-int-chart-version-env
+    - task: semver
+      cmd: echo ${var.common.int-chart-version} > ${common.OUTPUT_DIR}/var.semver
+    - task: major
+      cmd: echo ${var.common.int-chart-version} | cut -d '.' -f 1 > ${common.OUTPUT_DIR}/var.major
+
+  helm-get:
+    - task: fetch-helm-chart
+      description: Download integration chart for PRA actions and CSAR package activities
+      docker-image: common.release-auto
+      cmd: helm pull --repo ${var.common.int-chart-repo} ${var.common.int-chart-name} --version ${var.common.int-chart-version} -d ${common.OUTPUT_DIR}/ --username "${env.common.GERRIT_USERNAME}" --password "${env.common.GERRIT_PASSWORD}"
+
+  helm-checksum:
+    - task: checksum
+      docker-image: common.release-auto
+      cmd: sha256sum ${common.OUTPUT_DIR}/${var.common.int-chart-name}-${var.common.int-chart-version}.tgz | awk '{ print $1 }' > ${common.OUTPUT_DIR}/var.sha256-helm
+
+  git-commithash:
+    - task: get-commit-hash
+      docker-image: common.release-auto
+      cmd: git rev-list -n 1 ${var.semver} > ${common.OUTPUT_DIR}/var.commithash
+
+  csar:
+    - task: common.package:untar-int-chart
+    - task: common.package:fetch-ihc-crd
+    # - task: common.package:fetch-cncs-base-chart
+    # - task: common.package:untar-cncs-base-chart
+    # - task: common.package:fetch-cncs-crd
+    - task: common.package:copy-csar-files
+    - task: common.package:move-exposed-values-to-release-artifacts-dir
+    - task: r-state
+      docker-image: common.release-auto
+      cmd: get_rstate.py ${var.common.int-chart-version} > ${common.OUTPUT_DIR}/var.r-state
+    - task: common.package:update-vnfd
+    - task: common.package:csar
+    - task: upload
+      docker-image: common.inca
+      cmd: arm-upload -f ${common.OUTPUT_DIR}/eric-senp-infra-${var.common.int-chart-version}.csar
+                      -u ${common.CSAR_RELEASED_REPO}/${common.IHC_NAME}/${var.common.int-chart-version}/csar
+                      -t ${env.common.ARM_API_TOKEN}
+                      --debug
+    - task: upload-exposed-values
+      docker-image: common.inca
+      cmd: arm-upload -f ${common.OUTPUT_DIR}/release_artifacts/exposed-values-${var.common.int-chart-version}.yaml
+                      -u ${common.CSAR_RELEASED_REPO}/${common.IHC_NAME}/${var.common.int-chart-version}/exposed-values
+                      -t ${env.common.ARM_API_TOKEN}
+                      --debug
+
+  git-tag:
+    - task: git-tag
+      docker-image: common.release-auto
+      docker-flags:
+        - "--env GERRIT_USERNAME=${env.common.GERRIT_USERNAME}"
+        - "--env GERRIT_PASSWORD=\"${env.common.GERRIT_PASSWORD}\""
+      cmd: version-handler create-git-tag
+           --tag "pra/${var.semver}"
+           --message "PRA Release ${var.semver}"
+           --git-repo-url ${env.common.GIT_REPO_URL}
+           --commitid ${var.commithash}
+           --dry-run ${env.DRY_RUN}
+
+  help:
+    - task: common.help:package
+    - task: common.help:arm-upload
+    - task: common.help:auto-upload
+

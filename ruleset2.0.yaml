@@ -1,0 +1,295 @@
+modelVersion: 2.0
+
+import:
+  common: common-properties.yaml
+
+env:
+  - CHART_NAME
+  - CHART_REPO
+  - CHART_VERSION
+  - GERRIT_REFSPEC
+
+# Jenkins related parameters
+  - JENKINS_URL
+  - JOB_NAME
+  - BUILD_NUMBER
+
+# Version strategy possible values: DYNAMIC, MAJOR, MINOR, PATCH, EP
+# Explanation about the values: https://gerrit.ericsson.se/plugins/gitiles/adp-cicd/adp-int-helm-chart-auto/+/HEAD/README.md#How-to-use-ihc_auto-script
+  - VERSION_STRATEGY (default="DYNAMIC")
+
+# Allow downgrade of sub-chart dependencies
+  - ALLOW_DOWNGRADE (default=false)
+
+# Check sub-chart dependency version
+# In case that major/minor versions stepped but previous version is not released,
+# the creation of integration chart will fail
+  - VERSION_CHECK (default=true)
+
+# Publish intergration helm chart to released repo
+# if all sub-charts are released
+  - RELEASE (default=true)
+
+var:
+  - helm-dr-vm-args
+
+rules:
+  clean:
+    - rule: common.clean
+
+  init:
+    - rule: common.init
+    - task: helm-dr-vm-args
+      cmd: echo "-DhelmDesignRule.config.eric-clc-snia.DR-D1125-006=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D470222-010=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1120-012=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1120-014=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1120-016=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1125-018=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1125-019=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1125-020=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1124-021=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1125-022=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1120-025=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1120-030=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1125-030=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1126-030=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1125-031=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D470204-045=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1120-050=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1125-050=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1126-050=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1125-051=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1120-056=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D470204-057=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1125-060=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D470204-057=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1125-060=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1132-060=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1121-064=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1121-065=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1121-067=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1120-067=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1121-070=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D470204-070=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D470204-057=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1125-060=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1132-060=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1121-065=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1121-067=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1120-067=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1121-070=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D470204-070=skip\
+           -DhelmDesignRule.config.eric-clc-snia.GL-D470204-070=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1121-071=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1125-100=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1124-101=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1121-102=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1125-102=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1125-110=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1132-110=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1123-111=skip\
+           -DhelmDesignRule.config.eric-clc-snia.GL-D1124-111=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1124-112=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1123-113=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1123-114=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1123-115=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1121-120=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1123-120=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1121-121=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1123-121=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1121-122=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1123-124=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1123-125=skip\
+           -DhelmDesignRule.config.eric-data-document-database-pg.DR-D1123-127=skip\
+           -DhelmDesignRule.config.eric-data-document-database-pg.DR-D1123-128=skip\
+           -DhelmDesignRule.config.eric-data-document-database-pg.DR-D1123-133=skip\
+           -DhelmDesignRule.config.eric-data-distributed-coordinator-ed.DR-D1123-127=skip\
+           -DhelmDesignRule.config.eric-data-distributed-coordinator-ed.DR-D1123-128=skip\
+           -DhelmDesignRule.config.eric-data-document-database-pg.DR-D470217-001=skip\
+           -DhelmDesignRule.config.eric-sec-sip-tls.DR-D470217-001=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1122-131=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1123-134=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1123-137=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1121-140=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1121-144=skip\
+           -DhelmDesignRule.config.eric-clc-snia.DR-D1121-145=skip" > ${common.OUTPUT_DIR}/var.helm-dr-vm-args
+      ## DR-D470222-010 Log Collection Design Rules -> skip not compliant
+      ## ADP Services SHALL allow to configure a streaming method through
+      ## a global parameter global.log.streamingMethod.The configured value
+      ## indicates which streaming method has to be chosen by all services
+      ## to write log records:indirect,direct,dual
+      ## link: https://eteamspace.internal.ericsson.com/pages/viewpage.action?pageId=1346663632&navigatingVersions=true#LOGgeneraldesignrules-DR-D470222-010
+      ## DR-D1121-064 Helm templates with Ericsson product annotations -> Disable (CSH)
+      ## Every resource created from the Helm templates shall be annotated with
+      ## Ericsson product information (Deployments, StatefulSets, Services,
+      ## Custom Resources etc). PVC templates in StatefulSets are an exception.
+      ## Error: Product number doesn't follow ^(CXC|CXD|CXU|CXF)(\s|\d+)*$ regex
+
+  ihc:
+    - task: dev
+      description: Generate senp-infra chart locally
+      docker-image: common.inca
+      docker-envs:
+        - CHART_PATH=${common.IHC_PATH}
+        - VCS_REPO_URL=${env.common.VCS_REPO_URL}
+        - VCS_BRANCH=${env.common.VCS_BRANCH}
+        - HELM_USER=${env.common.HELM_USER}
+        - ARM_API_TOKEN=${env.common.ARM_API_TOKEN}
+        - HELM_INTERNAL_REPO=${common.HELM_INTERNAL_REPO}
+        - CI_HELM=true
+        - HELM_VERSION=${var.common.helm_version}
+      cmd: ihc-auto prepare-dev --debug
+    - task: prepare
+      description: Push senp-infra chart to internal repo
+      docker-image: common.inca
+      docker-envs:
+        - CHART_NAME
+        - CHART_REPO
+        - CHART_VERSION
+        - CHART_PATH=${common.IHC_PATH}
+        - GERRIT_USERNAME
+        - GERRIT_PASSWORD
+        - GERRIT_REFSPEC
+        - GIT_REPO_URL=${env.common.GIT_REPO_URL}
+        - GIT_BRANCH=${env.common.GIT_BRANCH}
+        - VCS_REPO_URL=${env.common.VCS_REPO_URL}
+        - VCS_BRANCH=${env.common.VCS_BRANCH}
+        - HELM_USER=${env.common.HELM_USER}
+        - ARM_API_TOKEN=${env.common.ARM_API_TOKEN}
+        - HELM_INTERNAL_REPO=${common.HELM_INTERNAL_REPO}
+        - HELM_DROP_REPO=${common.HELM_DROP_REPO}
+        - HELM_RELEASED_REPO=${common.HELM_RELEASED_REPO}
+        - ALLOW_DOWNGRADE=${env.ALLOW_DOWNGRADE}
+        - AUTOMATIC_RELEASE=${env.RELEASE} # TODO: check for removal
+        - ALWAYS_RELEASE=false # TODO: check for removal
+        - IGNORE_NON_RELEASED=false # TODO: check for removal
+        - GIT_TAG_ENABLED=true
+        - VERSION_STEP_STRATEGY_DEPENDENCY=${env.VERSION_STRATEGY}
+        - VERSION_STEP_STRATEGY_MANUAL=${env.VERSION_STRATEGY}
+        - VERSION_CHECK=${env.VERSION_CHECK}
+        - SKIP_INFO=true
+        - SOURCE=${env.JENKINS_URL}/job/${env.JOB_NAME}/${env.BUILD_NUMBER}
+        - GERRIT_TOPIC="scinfra"
+        - UPDATE_APP_VERSION=true
+        - CI_HELM=true
+        - HELM_VERSION=${var.common.helm_version}
+      cmd: ihc-auto prepare --debug
+    - task: publish
+      description: Push senp-infra chart to drop or release repo
+      docker-image: common.inca
+      docker-envs:
+        - CHART_NAME
+        - CHART_REPO
+        - CHART_VERSION
+        - CHART_PATH=${common.IHC_PATH}
+        - GERRIT_USERNAME
+        - GERRIT_PASSWORD
+        - GERRIT_REFSPEC
+        - GIT_REPO_URL=${env.common.GIT_REPO_URL}
+        - GIT_BRANCH=${env.common.GIT_BRANCH}
+        - VCS_REPO_URL=${env.common.VCS_REPO_URL}
+        - VCS_BRANCH=${env.common.VCS_BRANCH}
+        - HELM_USER=${env.common.HELM_USER}
+        - ARM_API_TOKEN=${env.common.ARM_API_TOKEN}
+        - HELM_INTERNAL_REPO=${common.HELM_INTERNAL_REPO}
+        - HELM_DROP_REPO=${common.HELM_DROP_REPO}
+        - HELM_RELEASED_REPO=${common.HELM_RELEASED_REPO}
+        - ALLOW_DOWNGRADE=${env.ALLOW_DOWNGRADE}
+        - AUTOMATIC_RELEASE=${env.RELEASE}
+        - ALWAYS_RELEASE=false
+        - IGNORE_NON_RELEASED=false
+        - GIT_TAG_ENABLED=true
+        - VERSION_STEP_STRATEGY_DEPENDENCY=${env.VERSION_STRATEGY}
+        - VERSION_STEP_STRATEGY_MANUAL=${env.VERSION_STRATEGY}
+        - VERSION_CHECK=${env.VERSION_CHECK}
+        - SKIP_INFO=true
+        - SOURCE=${env.JENKINS_URL}/job/${env.JOB_NAME}/${env.BUILD_NUMBER}
+        - GERRIT_TOPIC="scinfra"
+        - UPDATE_APP_VERSION=true
+        - CI_HELM=true
+        - HELM_VERSION=${var.common.helm_version}
+      cmd: ihc-auto publish --debug
+
+  csar:
+    - task: common.package:get-int-chart-name-property
+    - task: common.package:get-int-chart-repo-property
+    - task: common.package:get-int-chart-version-property
+    - task: common.package:untar-int-chart
+    - task: common.package:fetch-ihc-crd
+    # - task: common.package:fetch-cncs-base-chart
+    # - task: common.package:untar-cncs-base-chart
+    # - task: common.package:fetch-cncs-crd
+    - task: common.package:copy-csar-files
+    - task: common.package:move-exposed-values-to-release-artifacts-dir
+    - task: major
+      cmd: echo ${var.common.int-chart-version} | cut -d '.' -f 1 > ${common.OUTPUT_DIR}/var.major
+    - task: r-state
+      docker-image: common.release-auto
+      cmd: get_rstate.py ${var.common.int-chart-version} > ${common.OUTPUT_DIR}/var.r-state
+    - task: common.package:update-vnfd
+    - task: common.package:csar
+    - task: upload
+      docker-image: common.inca
+      cmd: arm-upload -f ${common.OUTPUT_DIR}/eric-senp-infra-${var.common.int-chart-version}.csar
+                      -u ${common.CSAR_DEV_REPO}/${common.IHC_NAME}/${var.common.int-chart-version}/csar
+                      -t ${env.common.ARM_API_TOKEN}
+                      --debug
+    - task: upload-exposed-values
+      docker-image: common.inca
+      cmd: arm-upload -f ${common.OUTPUT_DIR}/release_artifacts/exposed-values-${var.common.int-chart-version}.yaml
+                      -u ${common.CSAR_DEV_REPO}/${common.IHC_NAME}/${var.common.int-chart-version}/exposed-values
+                      -t ${env.common.ARM_API_TOKEN}
+                      --debug
+
+  lint:
+    - task: markdown
+      docker-image: common.doc-builder
+      cmd: markdownlint --config /etc/markdownlint-cli/adp.yaml $(git ls-files -- \*\.md | grep -v vendor | cat | xargs)
+    - task: helm
+      docker-image: common.release-auto
+      cmd: helm lint ${common.IHC_PATH}
+           --set eric-tm-senp-infra.interfaces[0]=br_senp
+    - task: helm-chart-check
+      docker-image: common.adp-helm-dr-check
+      cmd: helm-dr-check
+        ${var.helm-dr-vm-args}
+        --helm-chart ${common.IHC_PATH}
+        --output ${common.OUTPUT_DIR}/helm-dr-check/
+        --helm-v3
+        -Dhelmdrck.credential.file.path=${common.OUTPUT_DIR}/repositories.yaml
+        --log-level ALL
+    - task: jenkinsfiles
+      docker-image: common.release-auto
+      docker-envs:
+        - GERRIT_USERNAME
+        - GERRIT_PASSWORD
+      cmd: jenkins-lint --server ${env.common.HUDSON_URL} --username "${env.common.GERRIT_USERNAME}" --password "${env.common.GERRIT_PASSWORD}" $(git ls-files | grep jenkinsfile)
+    - task: inca-helm
+      docker-image: common.release-auto
+      cmd: helm lint ${common.OUTPUT_DIR}/${common.IHC_NAME}_tmp/${common.IHC_NAME}
+           --set eric-tm-senp-infra.interfaces[0]=br_senp
+    - task: inca-helm-chart-check
+      docker-image: common.adp-helm-dr-check
+      cmd: helm-dr-check
+        ${var.helm-dr-vm-args}
+        --helm-chart ${common.OUTPUT_DIR}/${common.IHC_NAME}_tmp/${common.IHC_NAME}
+        --output ${common.OUTPUT_DIR}/new-helm-dr-check/
+        --helm-v3
+        -Dhelmdrck.credential.file.path=${common.OUTPUT_DIR}/repositories.yaml
+        --log-level ALL
+
+  help:
+    - task: common.help:inca-config
+    - task: common.help:ihc-auto
+    - task: common.help:ihc-generate-artifacts
+    - task: common.help:ihc-update
+    - task: common.help:ihc-package
+    - task: common.help:arm-upload
+    - task: common.help:cihelm
+    - task: common.help:gerrit
+    - task: common.help:auto-jenkins-lint
+    - task: common.help:helm-dr-check
+    - task: common.help:markdown-lint
+    - task: common.help:package
+    
